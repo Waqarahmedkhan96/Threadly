@@ -26,13 +26,13 @@
       </button>
 
       <a class="navbar-brand fw-bold text-decoration-none" href="/">
-        <span class="brand-blazor text-lowercase">Blazor</span><span class="brand-forum fw-semibold">Forum</span>
+        <span class="brand-blazor text-lowercase">Blazor</span><span class="brand-threadly fw-semibold">Threadly</span>
       </a>
 
       <div class="d-none d-lg-block header-left-spacer"></div>
 
       <input class="form-control header-search"
-             placeholder="Search blazor forum…"
+             placeholder="Search Threadly…"
              @bind="headerSearch" @bind:event="oninput"
              @onkeydown="OnHeaderSearchKey" />
 
@@ -86,7 +86,7 @@
   </div>
 
   <footer class="text-center text-muted small py-3 border-top bg-white">
-    © @DateTime.Now.Year BlazorForum
+    © @DateTime.Now.Year Threadly
   </footer>
 </div>
 

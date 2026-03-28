@@ -17,7 +17,7 @@ body{ background:var(--ui-bg); color:var(--ui-text); }
 
 /* Brand wordmark */
 .navbar-brand .brand-blazor{ color:var(--brand-green); }
-.navbar-brand .brand-forum{ color:var(--brand-gold); }
+.navbar-brand .brand-threadly{ color:var(--brand-gold); }
 
 /* Primary brand button */
 .btn-brand{

@@ -20,7 +20,7 @@
   {
     "id": 6,
     "title": ".VS Code",
-    "body": "Nice \uD83D\uDC4F \u2014 looks like you\u2019re starting both your Blazor client and Web API projects \u2014 that\u2019s exactly the right way to run your Reddit-style forum app locally.",
+    "body": "Nice \uD83D\uDC4F \u2014 looks like you\u2019re starting both your Blazor client and Web API projects \u2014 that\u2019s exactly the right way to run your Reddit-style Threadly app locally.",
     "userId": 1
   },
   {
@@ -37,7 +37,7 @@
   },
   {
     "id": 9,
-    "title": "\uD83D\uDE80 Built a Reddit-style Blazor Forum with Full Login \u0026 Authorization from Scratch",
+    "title": "\uD83D\uDE80 Built a Reddit-style Threadly with Full Login \u0026 Authorization from Scratch",
     "body": "I just finished Assignment 6 (Authentication \u0026 Authorization) for my .NET Blazor course \u2014 and I\u2019m proud of how it turned out!\n\n\uD83D\uDD11 Users can sign up, log in, and log out, with all sessions persisted in the browser using sessionStorage.\n\uD83D\uDC64 The Account dropdown dynamically switches between \u201CSign in / Sign up\u201D and \u201CLog out\u201D \u002B username.\n\uD83D\uDCAC Once logged in, users can create, edit, and delete only their own posts and comments, while viewing everyone else\u2019s.\n\nOn the backend, I added an AuthController for POST /auth/login and simple DTOs (LoginRequest, UserDto).\nOn the frontend, Blazor uses a custom SimpleAuthProvider implementing AuthenticationStateProvider, wiring it all up with claims and state refreshes.\n\n\uD83D\uDD27 Tech stack:\n\nASP.NET Core Web API (.NET 10)\n\nBlazor Server (.NET 10)\n\nCustom AuthenticationStateProvider\n\nBootstrap 5 UI\n\nHere\u2019s what I learned:\n\nHow to use claims-based authentication in Blazor\n\nCascading authentication state with \u003CCascadingAuthenticationState\u003E\n\nUsing AuthorizeView and [Authorize] to protect UI and pages\n\nHow to cache login state in sessionStorage\n\nIt feels amazing to finally have a working login system integrated into a full-stack Blazor \u002B Web API app ",
     "userId": 10
   },

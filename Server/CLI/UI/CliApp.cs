@@ -19,7 +19,7 @@ public class CliApp
     {
         while (true)
         {
-            Console.WriteLine("\n=== Forum CLI ===");
+            Console.WriteLine("\n=== Threadly CLI ===");
             Console.WriteLine("1) Create user");
             Console.WriteLine("2) Create post");
             Console.WriteLine("3) Add comment");

@@ -1,5 +1,7 @@
 ﻿using Entities;
 using Microsoft.EntityFrameworkCore;
+using System.IO;
+using System.Linq;
 
 namespace EfcRepositories;
 public class AppContext : DbContext
@@ -10,8 +12,22 @@ public class AppContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // Absolute Path to one Shared DB File
-        const string dbPath = @"C:\Users\waqar\IT-DNP1Y - Source\ForumApp\Server\WebApi\app.db";
+        // Prefer the local WebApi database file relative to the current running assembly.
+        var baseDir = System.AppContext.BaseDirectory;
+        var candidatePaths = new[]
+        {
+            Path.Combine(baseDir, "app.db"),
+            Path.Combine(baseDir, "..", "app.db"),
+            Path.Combine(baseDir, "..", "..", "app.db"),
+            Path.Combine(baseDir, "..", "..", "..", "app.db"),
+            Path.Combine(baseDir, "..", "..", "..", "..", "WebApi", "app.db"),
+            Path.Combine(Directory.GetCurrentDirectory(), "app.db"),
+            Path.Combine(Directory.GetCurrentDirectory(), "Server", "WebApi", "app.db")
+        };
+
+        var dbPath = candidatePaths.FirstOrDefault(Path.Exists)
+                     ?? Path.GetFullPath(Path.Combine(baseDir, "..", "..", "WebApi", "app.db"));
+
         optionsBuilder.UseSqlite($"Data Source={dbPath}");
     }
 }
