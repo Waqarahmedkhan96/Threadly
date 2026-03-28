@@ -1,4 +1,6 @@
 using EfcRepositories;
+using Entities;
+using Microsoft.EntityFrameworkCore;
 using RepositoryContracts;
 using System.Text.Json;                     // JSON settings
 using System.Text.Json.Serialization;      // ReferenceHandler
@@ -36,6 +38,17 @@ builder.Services.AddScoped<ICommentRepository, EfcCommentRepository>();  // comm
 builder.Services.AddTransient<GlobalExceptionHandlerMiddleware>();
 
 var app = builder.Build();
+
+// seed default user if missing
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<EfAppContext>();
+    if (!db.Users.Any(u => u.Username == "Lala"))
+    {
+        db.Users.Add(new User("Lala", "3333"));
+        db.SaveChanges();
+    }
+}
 
 //plug middleware in early so it catches downstream exceptions
 app.UseMiddleware<GlobalExceptionHandlerMiddleware>();

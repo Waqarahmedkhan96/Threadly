@@ -1,7 +1,20 @@
-﻿<nav class="nav flex-column gap-1 app-nav">
-  <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">🏠 Home</NavLink>
-  <NavLink class="nav-link" href="/users">🧑‍🤝‍🧑 Users</NavLink>
-  <NavLink class="nav-link" href="/posts">📰 Posts</NavLink>
-  <NavLink class="nav-link" href="/comments">💬 Comments</NavLink>
-  <NavLink class="nav-link" href="/about">ℹ️ About Us</NavLink>
+﻿@using Microsoft.AspNetCore.Components.Routing
+
+<nav class="nav flex-column gap-3 app-nav">
+  <div class="sidebar-brand p-3 rounded-4 bg-white shadow-sm">
+    <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+      <div>
+        <div class="sidebar-title">Threadly</div>
+        <div class="sidebar-subtitle">Your feed, community, and conversations.</div>
+      </div>
+      <span class="badge badge-soft">Live</span>
+    </div>
+    <a class="btn btn-sm btn-gradient w-100" href="/posts">Explore feed</a>
+  </div>
+
+  <div class="nav-item"><NavLink class="nav-link" href="/" Match="NavLinkMatch.All">🏠 Home</NavLink></div>
+  <div class="nav-item"><NavLink class="nav-link" href="/users">👥 People</NavLink></div>
+  <div class="nav-item"><NavLink class="nav-link" href="/posts">📰 Posts</NavLink></div>
+  <div class="nav-item"><NavLink class="nav-link" href="/comments">💬 Comments</NavLink></div>
+  <div class="nav-item"><NavLink class="nav-link" href="/about">ℹ️ About</NavLink></div>
 </nav>

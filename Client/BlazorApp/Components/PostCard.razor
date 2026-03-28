@@ -1,33 +1,251 @@
 @using ApiContracts.Posts
-@namespace BlazorApp.Components
+@using ApiContracts.Comments
+@inject BlazorApp.Services.Interfaces.ICommentService CommentSvc
 
-<div class="card mb-3 post-card">
-  <div class="card-body">
-    <a class="h5 text-decoration-none" href="/posts/@Post.Id">@Post.Title</a>
-    <div class="text-muted small mb-2">
-      by @(string.IsNullOrWhiteSpace(Post.AuthorName) ? "Unknown" : Post.AuthorName)
+<div class="post-card-modern">
+  <div class="post-card-container">
+    <div class="post-header">
+      <div class="d-flex gap-3 align-items-start">
+        <div class="profile-avatar">
+          @GetInitials(Post.AuthorName)
+        </div>
+        <div class="profile-meta">
+          <div class="username">
+            @((string.IsNullOrWhiteSpace(Post.AuthorName) ? "Unknown" : Post.AuthorName))
+            <span class="post-time">4h ago</span>
+          </div>
+          <div class="text-muted small">Post #@Post.Id · Community update</div>
+        </div>
+      </div>
+
+      <div class="post-actions">
+        <button class="btn btn-sm btn-gradient action-pill" @onclick="HandleFollow">@followLabel</button>
+        <button class="icon-button" @onclick="ToggleMenu">⋯</button>
+      </div>
     </div>
 
-    @if (!string.IsNullOrWhiteSpace(Preview))
+    <div>
+      <a class="post-title-link" href="/posts/@Post.Id">@Post.Title</a>
+      <p class="post-copy @(expanded ? string.Empty : "collapsed")">@Body</p>
+      @if (NeedsSeeMore)
+      {
+        <button class="see-more" @onclick="ToggleExpanded">@(expanded ? "Show less" : "See more")</button>
+      }
+    </div>
+
+    <div class="post-media">
+      <div class="media-placeholder">Image preview • supports uploaded media</div>
+    </div>
+
+    <div class="interaction-bar">
+      <div class="interaction-actions">
+        <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="HandleLike">👍 Like</button>
+        <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="ToggleComments">💬 Comment</button>
+        <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="ToggleShare">🔄 Share</button>
+      </div>
+
+      <div class="interaction-summary">
+        <span>❤️ @likeCount</span>
+        <span>💬 @CommentCount</span>
+        <span>🔁 @shareCount</span>
+      </div>
+    </div>
+
+    @if (showLoginPrompt)
     {
-      <div class="mb-3">@Preview</div>
-    }
-    else
-    {
-      <div class="mb-3 text-muted">(no body)</div>
+      <div class="login-prompt text-muted">
+        Sign in to like, comment, or share this post.
+      </div>
     }
 
-    <div class="d-flex gap-2 align-items-center">
-      <a class="btn btn-brand btn-sm" href="/posts/@Post.Id">See full post</a>
-      <span class="badge rounded-pill badge-brand">
-        @CommentCount comment@(CommentCount == 1 ? "" : "s")
-      </span>
-    </div>
+    @if (likesPopup)
+    {
+      <div class="menu-panel mt-2">
+        <div class="text-muted small mb-2">Liked by</div>
+        <div class="d-flex flex-wrap gap-2">
+          @foreach (var name in likeNames)
+          {
+            <span class="badge badge-soft">@name</span>
+          }
+        </div>
+      </div>
+    }
+
+    @if (shareOpen)
+    {
+      <div class="share-panel mt-2">
+        <div class="d-flex flex-column gap-2">
+          <button class="btn btn-sm btn-gradient">Share to Threadly</button>
+          <button class="btn btn-sm btn-soft">Copy link</button>
+        </div>
+        <div class="text-muted small mt-3">Shared by @shareCount people</div>
+      </div>
+    }
+
+    @if (commentsOpen)
+    {
+      <div class="comments-panel mt-2">
+        @if (commentsLoading)
+        {
+          <div class="text-muted">Loading comments…</div>
+        }
+        else if (comments.Count == 0)
+        {
+          <div class="text-muted">No comments yet. Be the first to join the conversation.</div>
+        }
+        else
+        {
+          @foreach (var comment in comments)
+          {
+            <div class="comment-row">
+              <div class="comment-meta">
+                <span class="comment-author">@(string.IsNullOrWhiteSpace(comment.AuthorName) ? $"User {comment.AuthorUserId}" : comment.AuthorName)</span>
+                <span>@comment.CreatedAt.ToString("dd MMM")</span>
+              </div>
+              <div class="comment-body">@comment.Body</div>
+            </div>
+          }
+        }
+      </div>
+    }
   </div>
 </div>
 
 @code {
   [Parameter] public required PostSummaryDto Post { get; set; }
-  [Parameter] public string? Preview { get; set; }
+  [Parameter] public required string Preview { get; set; }
+  [Parameter] public required string FullBody { get; set; }
   [Parameter] public int CommentCount { get; set; }
+  [Parameter] public bool IsLoggedIn { get; set; }
+
+  private bool expanded;
+  private bool followState;
+  private bool likesPopup;
+  private bool commentsOpen;
+  private bool shareOpen;
+  private bool showLoginPrompt;
+  private bool commentsLoading;
+
+  private int likeCount;
+  private int shareCount;
+
+  private List<CommentDto> comments = new();
+  private readonly string[] likeNames = new[] { "Avery", "Jordan", "Mia", "Noah", "Kai" };
+
+  private string Body => FullBody;
+
+  private bool NeedsSeeMore => !expanded && Body.Length > 250;
+
+  private string followLabel => followState ? "Following" : "Follow";
+
+  protected override void OnInitialized()
+  {
+    likeCount = Math.Max(5, CommentCount + 12);
+    shareCount = Math.Max(3, CommentCount / 2 + 2);
+  }
+
+  private void HandleFollow()
+  {
+    if (!IsLoggedIn)
+    {
+      showLoginPrompt = true;
+      return;
+    }
+
+    followState = !followState;
+    showLoginPrompt = false;
+  }
+
+  private void HandleLike()
+  {
+    if (!IsLoggedIn)
+    {
+      showLoginPrompt = true;
+      likesPopup = false;
+      return;
+    }
+
+    showLoginPrompt = false;
+    likesPopup = true;
+
+    if (likeCount > 0)
+    {
+      likeCount += 1;
+    }
+  }
+
+  private async Task ToggleComments()
+  {
+    if (!IsLoggedIn)
+    {
+      showLoginPrompt = true;
+      return;
+    }
+
+    showLoginPrompt = false;
+    commentsOpen = !commentsOpen;
+
+    if (commentsOpen && comments.Count == 0)
+    {
+      await LoadComments();
+    }
+  }
+
+  private void ToggleShare()
+  {
+    if (!IsLoggedIn)
+    {
+      showLoginPrompt = true;
+      return;
+    }
+
+    showLoginPrompt = false;
+    shareOpen = !shareOpen;
+    if (shareOpen)
+    {
+      shareCount += 1;
+    }
+  }
+
+  private void ToggleMenu()
+  {
+    likesPopup = false;
+    shareOpen = false;
+    commentsOpen = false;
+    showLoginPrompt = false;
+  }
+
+  private void ToggleExpanded()
+  {
+    expanded = !expanded;
+  }
+
+  private async Task LoadComments()
+  {
+    commentsLoading = true;
+    try
+    {
+      comments = await CommentSvc.GetCommentsByPostIdAsync(Post.Id);
+    }
+    catch
+    {
+      comments = new List<CommentDto>();
+    }
+    finally
+    {
+      commentsLoading = false;
+    }
+  }
+
+  private static string GetInitials(string? name)
+  {
+    if (string.IsNullOrWhiteSpace(name))
+      return "T";
+
+    var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    if (parts.Length == 1)
+      return parts[0].Substring(0, 1).ToUpperInvariant();
+
+    return string.Concat(parts[0][0], parts[^1][0]).ToUpperInvariant();
+  }
 }

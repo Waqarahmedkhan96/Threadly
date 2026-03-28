@@ -10,8 +10,8 @@
 
 <div class="min-vh-100 d-flex flex-column">
   <!-- HEADER -->
-  <header class="border-bottom bg-white position-sticky top-0" style="z-index:1020;">
-    <div class="container-xxl d-flex align-items-center gap-3 py-2 px-3 w-100">
+  <header class="app-header position-sticky top-0" style="z-index:1020;">
+    <div class="container-xxl d-flex flex-wrap align-items-center gap-3 py-3 px-3 w-100">
 
       <!-- Hamburger (sm/md only) -->
       <button class="btn btn-brand-outline d-lg-none"
@@ -25,16 +25,22 @@
         </svg>
       </button>
 
-      <a class="navbar-brand fw-bold text-decoration-none" href="/">
-        <span class="brand-blazor text-lowercase">Blazor</span><span class="brand-threadly fw-semibold">Threadly</span>
+      <a class="navbar-brand d-flex align-items-center gap-3 text-decoration-none" href="/">
+        <div class="brand-copy no-logo">
+          <div class="brand-title">Threadly</div>
+          <div class="brand-tagline">A modern hub for threaded conversations.</div>
+        </div>
       </a>
 
       <div class="d-none d-lg-block header-left-spacer"></div>
 
-      <input class="form-control header-search"
-             placeholder="Search Threadly…"
-             @bind="headerSearch" @bind:event="oninput"
-             @onkeydown="OnHeaderSearchKey" />
+      <div class="flex-fill position-relative">
+        <input class="form-control header-search"
+               placeholder="Search Threadly…"
+               @bind="headerSearch" @bind:event="oninput"
+               @onkeydown="OnHeaderSearchKey" />
+        <span class="search-icon">🔎</span>
+      </div>
 
       <!-- Right actions -->
       <div class="ms-auto d-flex align-items-center gap-2">

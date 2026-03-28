@@ -6,10 +6,17 @@
 @inject NavigationManager Nav
 @inject BlazorApp.Services.Interfaces.IUserService UserService
 
-<h4 class="mb-3">Sign up</h4>
+<div class="auth-panel card">
+  <div class="card-body auth-body">
+    <div class="auth-header mb-4">
+      <div>
+        <div class="small text-muted">Create your free</div>
+        <h3 class="mb-1">Threadly account</h3>
+        <div class="text-muted">Join the community and start sharing meaningful conversations.</div>
+      </div>
+      <div class="auth-icon">✨</div>
+    </div>
 
-<div class="card">
-  <div class="card-body">
     <div class="mb-3">
       <label class="form-label">Username</label>
       <input class="form-control" @bind="userName" />
@@ -27,14 +34,20 @@
 
     @if (!string.IsNullOrWhiteSpace(error))
     {
-      <div class="alert alert-danger" role="alert">@error</div>
+      <div class="alert alert-gradient alert-danger" role="alert">@error</div>
     }
 
-    <button class="btn btn-success" @onclick="HandleSignup" disabled="@isBusy">
-      @(isBusy ? "Creating account..." : "Create account")
-    </button>
-    <button class="btn btn-secondary ms-2" @onclick="GoLogin">Back to Login</button>
-    @* ^^^ FIX: avoid nested quotes by calling a method instead of inline lambda with "/login" *@
+    @if (!string.IsNullOrWhiteSpace(success))
+    {
+      <div class="alert alert-gradient alert-success" role="alert">@success</div>
+    }
+
+    <div class="d-flex flex-wrap gap-2">
+      <button class="btn btn-gradient" @onclick="HandleSignup" disabled="@isBusy">@(isBusy ? "Creating account..." : "Create account")</button>
+      <button class="btn btn-soft" @onclick="GoLogin">Back to Login</button>
+    </div>
+
+    <div class="mt-4 small text-muted">Already have an account? Use the login page to access Threadly.</div>
   </div>
 </div>
 
@@ -44,6 +57,7 @@
   private string confirm = string.Empty;
   private bool isBusy = false;
   private string? error;
+  private string? success;
 
   private async Task HandleSignup()
   {
@@ -73,9 +87,10 @@
       };
 
       UserDto created = await UserService.AddUserAsync(create);
-
-      // After successful signup, send user to Login page to sign in
-      Nav.NavigateTo("/login");
+      success = "Your Threadly account is ready. Please log in to continue.";
+      userName = string.Empty;
+      password = string.Empty;
+      confirm = string.Empty;
     }
     catch (Exception ex)
     {

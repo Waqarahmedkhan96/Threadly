@@ -6,7 +6,7 @@
 @inject BlazorApp.Services.Interfaces.IUserService UserSvc
 @inject BlazorApp.Services.Interfaces.ICommentService CommentSvc
 @inject AuthenticationStateProvider AuthProvider
-@inject NavigationManager Nav   // nav service
+@inject NavigationManager Nav
 
 @if (!string.IsNullOrWhiteSpace(error))
 {
@@ -14,67 +14,78 @@
 }
 else if (post is null)
 {
-    <div>Loading…</div>
+    <div class="alert alert-secondary">Loading post…</div>
 }
 else
 {
-    <div class="mb-3">
-        <button class="btn btn-outline-secondary btn-sm" @onclick="GoBack">
-            ← Back
-        </button>
-    </div>
-
-    <div class="mb-4">
-        <h3 class="mb-1">@post.Title</h3>
-        <div class="text-muted mb-3">by @authorName</div>
-        <div class="p-3 border rounded bg-light">
-            @post.Body
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">@post.Title</h2>
+            <div class="text-muted">Posted by @authorName</div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-soft btn-sm" @onclick="GoBack">← Back</button>
+            <button class="btn btn-gradient btn-sm" disabled>
+                👍 Like
+            </button>
         </div>
     </div>
 
-    <div class="mb-3">
-        <h5>Comments (@(comments?.Count ?? 0))</h5>
-        @if (comments is null || comments.Count == 0)
-        {
-            <div class="text-muted">No comments yet.</div>
-        }
-        else
-        {
-            foreach (var c in comments)
-            {
-                <div class="border rounded p-2 mb-2">
-                    <div class="small text-muted">by @NameFor(c.AuthorUserId)</div>
-                    <div>@c.Body</div>
-                </div>
-            }
-        }
+    <div class="post-card mb-4">
+        <div class="card-body">
+            <div class="post-body">@post.Body</div>
+        </div>
     </div>
 
-    <div class="card">
-        <div class="card-body">
-            <h6 class="mb-2">Add a comment</h6>
+    <div class="row gx-4">
+        <div class="col-lg-7">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="card-title mb-0">Comments (@(comments?.Count ?? 0))</h5>
+                        <span class="badge badge-soft">Read only</span>
+                    </div>
 
-            @* login info *@
-            @if (currentUserId <= 0)
-            {
-                <div class="alert alert-info py-2 mb-2 small">
-                    Please log in to your account to post a comment.
+                    @if (comments is null || comments.Count == 0)
+                    {
+                        <div class="text-muted">No comments yet.</div>
+                    }
+                    else
+                    {
+                        foreach (var c in comments)
+                        {
+                            <div class="comment-card mb-3 p-3 rounded border">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="small text-muted">by @NameFor(c.AuthorUserId)</div>
+                                </div>
+                                <div>@c.Body</div>
+                            </div>
+                        }
+                    }
                 </div>
-            }
-
-            <div class="mb-2">
-                <input class="form-control"
-                       value="@(currentUserId > 0 ? $"{currentUserName} ({currentUserId})" : "Not logged in")"
-                       disabled />
             </div>
-            <textarea class="form-control mb-2" rows="3" placeholder="Write a comment…"
-                      @bind="newComment"></textarea>
+        </div>
 
-            <button class="btn btn-primary"
-                    @onclick="AddComment"
-                    disabled="@(currentUserId <= 0 || string.IsNullOrWhiteSpace(newComment))">
-                Post comment
-            </button>
+        <div class="col-lg-5">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Add a comment</h5>
+
+                    @if (currentUserId <= 0)
+                    {
+                        <div class="alert alert-info py-2 mb-3 small">
+                            Please log in to add a comment.
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <input class="form-control" value="@(currentUserId > 0 ? $"{currentUserName} ({currentUserId})" : "Not logged in")" disabled />
+                    </div>
+
+                    <textarea class="form-control mb-3" rows="4" placeholder="Write your comment…" @bind="newComment"></textarea>
+                    <button class="btn btn-gradient w-100" @onclick="AddComment" disabled="@(currentUserId <= 0 || string.IsNullOrWhiteSpace(newComment))">Post comment</button>
+                </div>
+            </div>
         </div>
     </div>
 }
@@ -89,7 +100,6 @@ else
     private string newComment = "";
     private string? error;
 
-    // ADDED
     private int currentUserId;
     private string currentUserName = "Unknown";
 
@@ -97,16 +107,13 @@ else
     {
         try
         {
-            // load auth state
             var auth = await AuthProvider.GetAuthenticationStateAsync();
             currentUserId = int.TryParse(auth.User.FindFirst("Id")?.Value, out var idc) ? idc : 0;
             currentUserName = auth.User.Identity?.Name ?? "Unknown";
 
-            // load post data
             post = await PostSvc.GetPostByIdAsync(id);
             users = await UserSvc.GetAllUsersAsync();
             authorName = users.FirstOrDefault(u => u.Id == post!.AuthorUserId)?.UserName ?? "Unknown";
-
             comments = await CommentSvc.GetCommentsByPostIdAsync(id);
         }
         catch (Exception ex)
@@ -115,7 +122,7 @@ else
         }
     }
 
-    private async Task AddComment() // create comment
+    private async Task AddComment()
     {
         error = null;
 
@@ -132,7 +139,7 @@ else
             await CommentSvc.CreateCommentAsync(id, new CreateCommentDto
             {
                 PostId = id,
-                AuthorUserId = currentUserId,   // ADDED
+                AuthorUserId = currentUserId,
                 Body = newComment
             });
 
@@ -145,8 +152,8 @@ else
         }
     }
 
-    private string NameFor(int userId) => // author lookup
-        users.FirstOrDefault(u => u.Id == userId)?.UserName ?? "Unknown";
+    private string NameFor(int userId) => users.FirstOrDefault(u => u.Id == userId)?.UserName ?? "Unknown";
 
-    private void GoBack() => Nav.NavigateTo("/posts"); // back to posts
+    private void GoBack() => Nav.NavigateTo("/posts");
 }
+

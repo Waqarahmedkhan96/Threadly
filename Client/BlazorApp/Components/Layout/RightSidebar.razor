@@ -1,16 +1,104 @@
-<div class="card mb-3">
-  <div class="card-body">
-    <h6 class="card-title">About Threadly</h6>
-    <p class="card-text">A tiny Reddit-style discussion board built with Blazor + Web API.</p>
-  </div>
-</div>
+@using ApiContracts.Posts
+@using ApiContracts.Comments
+@inject BlazorApp.Services.Interfaces.IPostService PostSvc
+@inject BlazorApp.Services.Interfaces.ICommentService CommentSvc
+@inject BlazorApp.Services.Interfaces.IUserService UserSvc
 
-<!-- you can populate later via real endpoints -->
-<div class="card">
+<div class="card accent-card mb-4">
   <div class="card-body">
-    <h6 class="card-title">Top Users</h6>
-    <ul class="list-unstyled mb-0">
-      <li>— coming soon —</li>
+    <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+      <div>
+        <h6 class="card-title mb-1">Threadly Pulse</h6>
+        <p class="card-text text-muted mb-0">Stay ahead of the community energy with trending conversations.</p>
+      </div>
+      <span class="badge badge-brand">Live</span>
+    </div>
+    <ul class="list-unstyled sidebar-features mb-0">
+      <li>Real-time community updates</li>
+      <li>Personalized feed view</li>
+      <li>Fast access to hot discussions</li>
     </ul>
   </div>
 </div>
+
+<div class="card sticky-card">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+      <h6 class="card-title mb-0">Most active posts</h6>
+      <span class="badge badge-soft">Top</span>
+    </div>
+
+    @if (isLoading)
+    {
+      <div class="text-muted small">Loading hot posts...</div>
+    }
+    else if (hotPosts is null || hotPosts.Count == 0)
+    {
+      <div class="text-muted small">No hot topics yet.</div>
+    }
+    else
+    {
+      <ul class="list-unstyled hot-posts-list mb-0">
+        @foreach (var item in hotPosts)
+        {
+          <li class="hot-post-item mb-3">
+            <a class="hot-post-link" href="/posts/@item.Id">@item.Title</a>
+            <div class="small text-muted">@item.CommentCount comments</div>
+          </li>
+        }
+      </ul>
+    }
+
+    <div class="mt-4">
+      <a class="btn btn-sm btn-gradient w-100" href="/posts">Browse all posts</a>
+    </div>
+  </div>
+</div>
+
+@code {
+  private bool isLoading;
+  private List<HotPost>? hotPosts;
+
+  protected override async Task OnInitializedAsync()
+  {
+    await LoadHotPostsAsync();
+  }
+
+  private async Task LoadHotPostsAsync()
+  {
+    isLoading = true;
+    try
+    {
+      var posts = await PostSvc.GetPostsAsync(new ApiContracts.Posts.PostQueryParameters { TitleContains = null });
+      var comments = await CommentSvc.GetAllCommentsAsync();
+      var commentCounts = comments.GroupBy(c => c.PostId).ToDictionary(g => g.Key, g => g.Count());
+
+      hotPosts = posts
+        .Select(p => new HotPost
+        {
+          Id = p.Id,
+          Title = p.Title ?? "Untitled",
+          CommentCount = commentCounts.TryGetValue(p.Id, out var count) ? count : 0
+        })
+        .OrderByDescending(p => p.CommentCount)
+        .ThenByDescending(p => p.Id)
+        .Take(5)
+        .ToList();
+    }
+    catch
+    {
+      hotPosts = new List<HotPost>();
+    }
+    finally
+    {
+      isLoading = false;
+    }
+  }
+
+  private class HotPost
+  {
+    public int Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public int CommentCount { get; set; }
+  }
+}

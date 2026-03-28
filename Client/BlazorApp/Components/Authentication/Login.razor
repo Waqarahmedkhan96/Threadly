@@ -3,28 +3,48 @@
 @* <= make this page interactive so @onclick works *@
 @using ApiContracts.Authentication
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.WebUtilities
 @using BlazorApp.Services.Auth
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
 
-<h4 class="mb-3">Login</h4>
-
-<AuthorizeView>
-  <Authorized>
-    <div class="alert alert-success d-flex align-items-center justify-content-between">
+<div class="auth-panel card">
+  <div class="card-body auth-body">
+    <div class="auth-header mb-4">
       <div>
-        ✅ You are signed in as <strong>@context.User.Identity?.Name</strong>.
+        <div class="small text-muted">Welcome back to</div>
+        <h3 class="mb-1">Threadly</h3>
+        <div class="text-muted">Sign in to continue reading posts and joining conversations.</div>
       </div>
-      <div>
-        <button class="btn btn-outline-danger btn-sm" @onclick="DoLogout">Logout</button>
-        <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="GoHome">Home</button>
-      </div>
+      <div class="auth-icon">🔒</div>
     </div>
-  </Authorized>
 
-  <NotAuthorized>
-    <div class="card">
-      <div class="card-body">
+    <AuthorizeView>
+      <Authorized>
+        <div class="alert alert-gradient alert-success d-flex align-items-center justify-content-between">
+          <div>
+            ✅ You are signed in as <strong>@context.User.Identity?.Name</strong>.
+          </div>
+          <div>
+            <button class="btn btn-soft btn-sm" @onclick="DoLogout">Logout</button>
+            <button class="btn btn-soft btn-sm ms-2" @onclick="GoHome">Home</button>
+          </div>
+        </div>
+      </Authorized>
+
+      <NotAuthorized>
+        @if (!string.IsNullOrWhiteSpace(infoMessage))
+        {
+          <div class="alert alert-gradient alert-success" role="alert">@infoMessage</div>
+        }
+
+        <div class="alert alert-info d-flex align-items-center justify-content-between">
+          <div>
+            New here? Register to join Threadly and unlock full community access.
+          </div>
+          <a class="btn btn-gradient btn-sm" href="/signup">Register now</a>
+        </div>
+
         <div class="mb-3">
           <label class="form-label">Username</label>
           <input class="form-control" @bind="userName" autocomplete="username" />
@@ -37,23 +57,26 @@
 
         @if (!string.IsNullOrWhiteSpace(error))
         {
-          <div class="alert alert-danger" role="alert">@error</div>
+          <div class="alert alert-gradient alert-danger" role="alert">@error</div>
         }
 
-        <button class="btn btn-primary" @onclick="HandleLogin" disabled="@isBusy">
-          @(isBusy ? "Signing in..." : "Sign in")
-        </button>
-        <button class="btn btn-secondary ms-2" @onclick="Cancel" disabled="@isBusy">Cancel</button>
-      </div>
-    </div>
-  </NotAuthorized>
-</AuthorizeView>
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-gradient" @onclick="HandleLogin" disabled="@isBusy">@(isBusy ? "Signing in..." : "Sign in")</button>
+          <button class="btn btn-soft" @onclick="Cancel" disabled="@isBusy">Cancel</button>
+        </div>
+        <div class="mt-4 small text-muted">Need an account? Start with Threadly.</div>
+        <a class="btn btn-soft mt-2" href="/signup">Register now</a>
+      </NotAuthorized>
+    </AuthorizeView>
+  </div>
+</div>
 
 @code {
   private string userName = string.Empty;
   private string password = string.Empty;
   private bool isBusy = false;
   private string? error;
+  private string? infoMessage;
 
   private async Task HandleLogin()
   {
@@ -91,6 +114,22 @@
     var simple = (SimpleAuthProvider)AuthProvider;
     await simple.LogoutAsync();   // ADDED: clears sessionStorage as well
     Nav.NavigateTo("/");
+  }
+
+  protected override void OnInitialized()
+  {
+    base.OnInitialized();
+    SetLoginMessageFromQuery();
+  }
+
+  private void SetLoginMessageFromQuery()
+  {
+    var uri = new Uri(Nav.Uri);
+    var query = QueryHelpers.ParseQuery(uri.Query);
+    if (query.TryGetValue("registered", out var registered) && string.Equals(registered, "true", StringComparison.OrdinalIgnoreCase))
+    {
+      infoMessage = "Your account was created successfully. Please sign in.";
+    }
   }
 
   private void Cancel() => Nav.NavigateTo("/");
