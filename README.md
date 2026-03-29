@@ -44,10 +44,10 @@ It is designed to simulate a **real-world scalable product**, focusing on:
 ## 🎬 Preview
 
 ### Sign Up
-![Sign Up](./preview/signup.png)
+![Sign Up](/preview/signup.png)
 
 ### Log In
-![Log In](./preview/login.png)
+![Log In](/preview/login.png)
 
 ### Home Feed
 ![Home Feed 1](./preview/home-feed-1.png)
