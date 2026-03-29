@@ -3,3 +3,14 @@ obj/
 .vscode/
 *.user
 *.suo
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Ignore all database files except the main demo DB
+*.db
+!Server/WebApi/app.db
+
+# Ignore accidental nested server copies
+Server/WebApi/Server/

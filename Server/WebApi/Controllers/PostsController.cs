@@ -1,11 +1,12 @@
-
 using ApiContracts.Posts;
 using ApiContracts.Comments;
+using EfcRepositories;
 using Entities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RepositoryContracts;
-using RepositoryContracts.ExceptionHandling;
-using Microsoft.EntityFrameworkCore; // EF async
+using System.IO;
 
 namespace WebApi.Controllers;
 
@@ -15,70 +16,89 @@ public class PostsController : ControllerBase
 {
     private readonly IPostRepository _posts;
     private readonly ICommentRepository _comments;
+    private readonly EfcRepositories.AppContext _context;
 
-    public PostsController(IPostRepository posts, ICommentRepository comments)
+    public PostsController(IPostRepository posts, ICommentRepository comments, EfcRepositories.AppContext context)
     {
         _posts = posts;
         _comments = comments;
+        _context = context;
     }
 
-    // POST /posts
     [HttpPost]
     public async Task<ActionResult<PostDto>> Create([FromBody] CreatePostDto dto)
     {
         var post = new Post { Title = dto.Title, Body = dto.Body, UserId = dto.AuthorUserId };
         var created = await _posts.AddAsync(post);
 
-        var result = new PostDto
-        {
-            Id = created.Id,
-            Title = created.Title,
-            Body = created.Body,
-            AuthorUserId = created.UserId,
-            AuthorName = null, // don*t load user here
-            Comments = new() // empty by default
-        };
+        var reloaded = await _context.Posts
+            .Include(p => p.Media)
+            .Include(p => p.Likes)
+            .SingleAsync(p => p.Id == created.Id);
 
+        var result = MapPostToDto(reloaded, null, Request);
         return Created($"/posts/{result.Id}", result);
     }
 
-    // GET /posts/{id}
-    [HttpGet("{id:int}")]
-    public async Task<ActionResult<PostDto>> GetById(int id)
+    [HttpPost("upload")]
+    public async Task<ActionResult<PostDto>> CreateWithMedia([FromForm] CreatePostForm form)
     {
-        var post = await _posts.GetSingleAsync(id);
+        var post = new Post { Title = form.Title, Body = form.Body, UserId = form.AuthorUserId };
+        var created = await _posts.AddAsync(post);
 
-        var dto = new PostDto
+        var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+        if (!Directory.Exists(uploadsFolder))
+            Directory.CreateDirectory(uploadsFolder);
+
+        var mediaEntities = new List<PostMedia>();
+
+        foreach (var file in form.Files)
         {
-            Id = post.Id,
-            Title = post.Title,
-            Body = post.Body,
-            AuthorUserId = post.UserId,
-            AuthorName = null,
-            Comments = new()
-        };
+            if (file.Length == 0) continue;
 
-        return Ok(dto);
-    }
+            var extension = Path.GetExtension(file.FileName);
+            var fileName = $"{Guid.NewGuid()}{extension}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
 
-    // GET /posts?titleContains=...&authorUserId=1
-    [HttpGet]
-    public async Task<ActionResult<IEnumerable<PostDto>>> GetMany(
-        [FromQuery] string? titleContains,
-        [FromQuery] int? authorUserId)
-    {
-        var query = _posts.GetManyAsync();
+            await using var stream = System.IO.File.Create(filePath);
+            await file.CopyToAsync(stream);
 
-        if (!string.IsNullOrWhiteSpace(titleContains))
-        {
-            string term = titleContains.ToLower(); // EF-safe
-            query = query.Where(p => p.Title.ToLower().Contains(term));
+            var mediaType = file.ContentType.StartsWith("video/", StringComparison.OrdinalIgnoreCase) ? "video"
+                          : file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) ? "image"
+                          : "unknown";
+
+            mediaEntities.Add(new PostMedia
+            {
+                PostId = created.Id,
+                Url = $"/uploads/{fileName}",
+                MediaType = mediaType
+            });
         }
 
-        if (authorUserId is not null)
-            query = query.Where(p => p.UserId == authorUserId.Value);
+        if (mediaEntities.Count > 0)
+        {
+            await _context.PostMedias.AddRangeAsync(mediaEntities);
+            await _context.SaveChangesAsync();
+        }
 
-        var list = await query
+        var reloaded = await _context.Posts
+            .Include(p => p.Media)
+            .Include(p => p.Likes)
+            .SingleAsync(p => p.Id == created.Id);
+
+        var result = MapPostToDto(reloaded, null, Request);
+        return Created($"/posts/{result.Id}", result);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<PostDto>> GetById(int id, [FromQuery] int? currentUserId = null)
+    {
+        var query = _posts.GetManyAsync()
+            .Where(p => p.Id == id)
+            .Include(p => p.Media)
+            .Include(p => p.Likes);
+
+        var dto = await query
             .Select(p => new PostDto
             {
                 Id = p.Id,
@@ -86,34 +106,80 @@ public class PostsController : ControllerBase
                 Body = p.Body,
                 AuthorUserId = p.UserId,
                 AuthorName = null,
+                Media = p.Media.Select(m => new PostMediaDto
+                {
+                    Url = m.Url,
+                    MediaType = m.MediaType
+                }).ToList(),
+                LikeCount = p.Likes.Count,
+                IsLikedByCurrentUser = currentUserId.HasValue && p.Likes.Any(l => l.UserId == currentUserId.Value),
                 Comments = new()
             })
-            .ToListAsync(); // async DB
+            .FirstOrDefaultAsync();
+
+        if (dto is null)
+            return NotFound();
+
+        dto.Media = dto.Media
+            .Select(m => new PostMediaDto
+            {
+                Url = NormalizeMediaUrl(m.Url, Request),
+                MediaType = NormalizeMediaType(m.MediaType, m.Url)
+            })
+            .ToList();
+
+        return Ok(dto);
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<PostSummaryDto>>> GetMany(
+        [FromQuery] string? titleContains,
+        [FromQuery] int? authorUserId)
+    {
+        var query = _posts.GetManyAsync();
+
+        if (!string.IsNullOrWhiteSpace(titleContains))
+        {
+            string term = titleContains.ToLower();
+            query = query.Where(p => p.Title.ToLower().Contains(term));
+        }
+
+        if (authorUserId is not null)
+            query = query.Where(p => p.UserId == authorUserId.Value);
+
+        var list = await query
+            .Select(p => new PostSummaryDto
+            {
+                Id = p.Id,
+                Title = p.Title,
+                AuthorName = null,
+                HasMedia = p.Media.Any(),
+                LikeCount = p.Likes.Count,
+                IsLiked = false
+            })
+            .ToListAsync();
 
         return Ok(list);
     }
 
-    // PUT /posts/{id}
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePostDto dto)
     {
-        var existingPost = await _posts.GetSingleAsync(id);   // keeping same author
+        var existingPost = await _posts.GetSingleAsync(id);
         existingPost.Title = dto.Title;
-        existingPost.Body  = dto.Body;
+        existingPost.Body = dto.Body;
 
         await _posts.UpdateAsync(existingPost);
         return NoContent();
     }
 
-    // DELETE /posts/{id}
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
-        //  cascade comments for this post
         var commentIds = await _comments.GetManyAsync()
-                                        .Where(c => c.PostId == id)
-                                        .Select(c => c.Id)
-                                        .ToListAsync(); // async
+            .Where(c => c.PostId == id)
+            .Select(c => c.Id)
+            .ToListAsync();
 
         foreach (var cid in commentIds)
             await _comments.DeleteAsync(cid);
@@ -122,51 +188,95 @@ public class PostsController : ControllerBase
         return NoContent();
     }
 
-    // ADVANCED: GET /posts/{id}/details?includeAuthor=true&includeComments=true
-    [HttpGet("{id:int}/details")]
-    public async Task<ActionResult<PostDto>> GetDetails(
-        int id,
-        [FromQuery] bool includeAuthor = false,
-        [FromQuery] bool includeComments = false)
+    [HttpPost("{id:int}/likes")]
+    public async Task<ActionResult<LikeStatusDto>> ToggleLike(int id, [FromBody] PostLikeDto dto)
     {
-        // base query: just this post
-        IQueryable<Post> query = _posts.GetManyAsync()
-            .Where(p => p.Id == id);
+        await _posts.GetSingleAsync(id);
 
-        // includes (joins in SQL)
-        if (includeAuthor)
-            query = query.Include(p => p.User); // join User table
+        var existing = await _context.PostLikes.FindAsync(id, dto.UserId);
+        if (existing is not null)
+        {
+            _context.PostLikes.Remove(existing);
+            await _context.SaveChangesAsync();
+            var count = await _context.PostLikes.CountAsync(l => l.PostId == id);
+            return Ok(new LikeStatusDto { LikeCount = count, IsLiked = false });
+        }
 
-        if (includeComments)
-            query = query.Include(p => p.Comments).ThenInclude(c => c.User);  // join Comment table
+        _context.PostLikes.Add(new PostLike { PostId = id, UserId = dto.UserId });
+        await _context.SaveChangesAsync();
+        var newCount = await _context.PostLikes.CountAsync(l => l.PostId == id);
+        return Ok(new LikeStatusDto { LikeCount = newCount, IsLiked = true });
+    }
 
-        // project to existing PostDto
-        var dto = await query
-            .Select(p => new PostDto
-            {
-                Id = p.Id,
-                Title = p.Title,
-                Body = p.Body,
-                AuthorUserId = p.UserId,
-                AuthorName = includeAuthor ? p.User.Username : null,
+    [HttpGet("{id:int}/likes")]
+    public async Task<ActionResult<LikeStatusDto>> GetLikeStatus(int id, [FromQuery] int? userId = null)
+    {
+        await _posts.GetSingleAsync(id);
+        var count = await _context.PostLikes.CountAsync(l => l.PostId == id);
+        var liked = userId.HasValue && await _context.PostLikes.AnyAsync(l => l.PostId == id && l.UserId == userId.Value);
+        return Ok(new LikeStatusDto { LikeCount = count, IsLiked = liked });
+    }
 
-                   Comments = includeComments
-                    ? p.Comments.Select(c => new CommentDto
-                    {
-                        Id = c.Id,
-                        PostId = c.PostId,
-                        AuthorUserId = c.UserId,
-                        AuthorName = c.User.Username,
-                        Body = c.Body,
-                        CreatedAt = c.CreatedAt   
-                    }).ToList()
-                    : new List<CommentDto>()
-            })
-            .FirstOrDefaultAsync(); // execute query
+    private static PostDto MapPostToDto(Post post, int? currentUserId, HttpRequest request)
+    {
+        return new PostDto
+        {
+            Id = post.Id,
+            Title = post.Title,
+            Body = post.Body,
+            AuthorUserId = post.UserId,
+            AuthorName = null,
+            Media = (post.Media ?? new List<PostMedia>())
+                .Select(m => new PostMediaDto
+                {
+                    Url = NormalizeMediaUrl(m.Url, request),
+                    MediaType = NormalizeMediaType(m.MediaType, m.Url)
+                })
+                .ToList(),
+            LikeCount = post.Likes?.Count ?? 0,
+            IsLikedByCurrentUser = currentUserId.HasValue && (post.Likes?.Any(l => l.UserId == currentUserId.Value) ?? false),
+            Comments = new()
+        };
+    }
 
-        if (dto is null)
-            return NotFound();
+    private static string NormalizeMediaUrl(string? url, HttpRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            return string.Empty;
 
-        return Ok(dto);
+        if (Uri.TryCreate(url, UriKind.Absolute, out _))
+            return url;
+
+        return $"{request.Scheme}://{request.Host}{url}";
+    }
+
+    private static string NormalizeMediaType(string? mediaType, string? url)
+    {
+        if (!string.IsNullOrWhiteSpace(mediaType))
+        {
+            var lower = mediaType.Trim().ToLowerInvariant();
+
+            if (lower.StartsWith("image/") || lower == "image")
+                return "image";
+            if (lower.StartsWith("video/") || lower == "video")
+                return "video";
+        }
+
+        var ext = Path.GetExtension(url ?? string.Empty).ToLowerInvariant();
+
+        return ext switch
+        {
+            ".jpg" or ".jpeg" or ".png" or ".gif" or ".webp" or ".bmp" or ".svg" => "image",
+            ".mp4" or ".webm" or ".ogg" or ".mov" => "video",
+            _ => "unknown"
+        };
+    }
+
+    public class CreatePostForm
+    {
+        public required string Title { get; set; }
+        public required string Body { get; set; }
+        public required int AuthorUserId { get; set; }
+        public List<IFormFile> Files { get; set; } = new();
     }
 }

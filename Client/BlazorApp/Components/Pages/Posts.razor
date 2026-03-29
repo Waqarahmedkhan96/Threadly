@@ -1,6 +1,7 @@
 @page "/posts"
 @using ApiContracts.Posts
 @using ApiContracts.Users
+@using Microsoft.AspNetCore.Components.Forms
 @inject BlazorApp.Services.Interfaces.IPostService postService
 @inject BlazorApp.Services.Interfaces.IUserService userService
 @inject AuthenticationStateProvider AuthProvider
@@ -29,6 +30,17 @@
       <div class="col-12">
         <label class="form-label">Body</label>
         <textarea class="form-control" rows="5" @bind="body"></textarea>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Attach images or video</label>
+        <InputFile OnChange="HandleSelectedFiles" multiple accept="image/*,video/*" />
+        @if (selectedFiles?.Count > 0)
+        {
+          <div class="mt-2 small text-muted">
+            Selected files: @string.Join(", ", selectedFiles.Select(f => f.Name))
+          </div>
+        }
       </div>
 
       <div class="col-12 col-md-4">
@@ -109,6 +121,7 @@ else
   // create/edit form state
   private string? title, body, error, ok;
   private int authorId;            // filled from auth
+  private IReadOnlyList<IBrowserFile>? selectedFiles;
   private bool busy, isEditing = false;
   private int editingPostId;
   private bool isEditingMyOwn;
@@ -200,12 +213,23 @@ else
     busy = true;
     try
     {
-      await postService.CreatePostAsync(new CreatePostDto
+      if (selectedFiles is { Count: > 0 })
       {
-        Title = title!, Body = body!, AuthorUserId = currentUserId
-      });
+        await postService.CreatePostWithMediaAsync(new CreatePostDto
+        {
+          Title = title!, Body = body!, AuthorUserId = currentUserId
+        }, selectedFiles);
+      }
+      else
+      {
+        await postService.CreatePostAsync(new CreatePostDto
+        {
+          Title = title!, Body = body!, AuthorUserId = currentUserId
+        });
+      }
 
       title = body = string.Empty;
+      selectedFiles = null;
       ok = "Post published.";
       await Load();
     }
@@ -263,7 +287,13 @@ else
   {
     isEditing = false;
     title = body = string.Empty;
+    selectedFiles = null;
     ok = error = null;
+  }
+
+  private void HandleSelectedFiles(InputFileChangeEventArgs e)
+  {
+    selectedFiles = e.GetMultipleFiles();
   }
 
   private async Task Delete(int id) // delete post

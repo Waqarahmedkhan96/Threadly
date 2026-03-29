@@ -2,11 +2,13 @@
 @using ApiContracts.Posts
 @using ApiContracts.Users
 @using ApiContracts.Comments
+@using System.IO
 @inject BlazorApp.Services.Interfaces.IPostService PostSvc
 @inject BlazorApp.Services.Interfaces.IUserService UserSvc
 @inject BlazorApp.Services.Interfaces.ICommentService CommentSvc
 @inject AuthenticationStateProvider AuthProvider
 @inject NavigationManager Nav
+@inject BlazorApp.Services.Auth.SimpleAuthProvider SimpleAuthProvider
 
 @if (!string.IsNullOrWhiteSpace(error))
 {
@@ -25,8 +27,8 @@ else
         </div>
         <div class="d-flex flex-wrap gap-2">
             <button class="btn btn-soft btn-sm" @onclick="GoBack">← Back</button>
-            <button class="btn btn-gradient btn-sm" disabled>
-                👍 Like
+            <button class="btn btn-gradient btn-sm" @onclick="ToggleLike" disabled="@(currentUserId <= 0)">
+                @(isLiked ? "💔 Unlike" : "👍 Like") (@likeCount)
             </button>
         </div>
     </div>
@@ -34,6 +36,30 @@ else
     <div class="post-card mb-4">
         <div class="card-body">
             <div class="post-body">@post.Body</div>
+
+            @if (post.Media?.Count > 0)
+{
+    <div class="mt-4 d-flex flex-wrap gap-3">
+        @foreach (var media in post.Media)
+        {
+            @if (IsImage(media))
+            {
+                <img src="@media.Url" alt="Post image" class="img-fluid rounded shadow-sm" style="max-height: 320px; width: auto;" />
+            }
+            else if (IsVideo(media))
+            {
+                <video controls class="w-100 rounded shadow-sm" style="max-height: 360px;">
+                    <source src="@media.Url" />
+                    Your browser does not support the video tag.
+                </video>
+            }
+            else
+            {
+                <div class="border rounded p-3 text-muted">Unsupported media format</div>
+            }
+        }
+    </div>
+}
         </div>
     </div>
 
@@ -102,6 +128,8 @@ else
 
     private int currentUserId;
     private string currentUserName = "Unknown";
+    private bool isLiked;
+    private int likeCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -111,10 +139,13 @@ else
             currentUserId = int.TryParse(auth.User.FindFirst("Id")?.Value, out var idc) ? idc : 0;
             currentUserName = auth.User.Identity?.Name ?? "Unknown";
 
-            post = await PostSvc.GetPostByIdAsync(id);
+            post = await PostSvc.GetPostByIdAsync(id, currentUserId);
             users = await UserSvc.GetAllUsersAsync();
             authorName = users.FirstOrDefault(u => u.Id == post!.AuthorUserId)?.UserName ?? "Unknown";
             comments = await CommentSvc.GetCommentsByPostIdAsync(id);
+
+            likeCount = post.LikeCount;
+            isLiked = post.IsLikedByCurrentUser;
         }
         catch (Exception ex)
         {
@@ -122,6 +153,29 @@ else
         }
     }
 
+private static bool IsImage(PostMediaDto? media)
+{
+    if (media is null) return false;
+
+    var type = media.MediaType?.Trim().ToLowerInvariant();
+    if (type == "image" || (type?.StartsWith("image/") ?? false))
+        return true;
+
+    var ext = Path.GetExtension(media.Url ?? string.Empty).ToLowerInvariant();
+    return ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".webp" or ".bmp" or ".svg";
+}
+
+private static bool IsVideo(PostMediaDto? media)
+{
+    if (media is null) return false;
+
+    var type = media.MediaType?.Trim().ToLowerInvariant();
+    if (type == "video" || (type?.StartsWith("video/") ?? false))
+        return true;
+
+    var ext = Path.GetExtension(media.Url ?? string.Empty).ToLowerInvariant();
+    return ext is ".mp4" or ".webm" or ".ogg" or ".mov";
+}
     private async Task AddComment()
     {
         error = null;
@@ -153,6 +207,28 @@ else
     }
 
     private string NameFor(int userId) => users.FirstOrDefault(u => u.Id == userId)?.UserName ?? "Unknown";
+
+    private async Task ToggleLike()
+    {
+        error = null;
+
+        if (currentUserId <= 0)
+        {
+            error = "Please log in to your account to like this post.";
+            return;
+        }
+
+        try
+        {
+            var status = await PostSvc.ToggleLikeAsync(id, currentUserId);
+            likeCount = status.LikeCount;
+            isLiked = status.IsLiked;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+        }
+    }
 
     private void GoBack() => Nav.NavigateTo("/posts");
 }

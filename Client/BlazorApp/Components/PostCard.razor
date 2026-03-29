@@ -1,6 +1,8 @@
 @using ApiContracts.Posts
 @using ApiContracts.Comments
 @inject BlazorApp.Services.Interfaces.ICommentService CommentSvc
+@inject BlazorApp.Services.Interfaces.IPostService PostSvc
+@inject BlazorApp.Services.Auth.SimpleAuthProvider SimpleAuthProvider
 
 <div class="post-card-modern">
   <div class="post-card-container">
@@ -26,20 +28,46 @@
 
     <div>
       <a class="post-title-link" href="/posts/@Post.Id">@Post.Title</a>
-      <p class="post-copy @(expanded ? string.Empty : "collapsed")">@Body</p>
+      <p class="post-copy @(expanded ? string.Empty : "collapsed")">@DisplayedBody</p>
       @if (NeedsSeeMore)
       {
         <button class="see-more" @onclick="ToggleExpanded">@(expanded ? "Show less" : "See more")</button>
       }
     </div>
 
-    <div class="post-media">
-      <div class="media-placeholder">Image preview • supports uploaded media</div>
-    </div>
+    @if (Media?.Count > 0)
+    {
+      <div class="post-media">
+        @foreach (var media in Media)
+        {
+          @if (IsImage(media))
+          {
+            <img src="@media.Url" alt="Uploaded image" class="post-media-image" />
+          }
+          else if (IsVideo(media))
+          {
+            <video controls class="post-media-video">
+              <source src="@media.Url" />
+              Your browser does not support the video tag.
+            </video>
+          }
+          else
+          {
+            <div class="media-placeholder">Unsupported media format</div>
+          }
+        }
+      </div>
+    }
+    else
+    {
+      <div class="post-media">
+        <div class="media-placeholder">No media attached</div>
+      </div>
+    }
 
     <div class="interaction-bar">
       <div class="interaction-actions">
-        <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="HandleLike">👍 Like</button>
+        <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="HandleLike">@(IsLiked ? "👍 Unlike" : "👍 Like")</button>
         <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="ToggleComments">💬 Comment</button>
         <button class="btn btn-outline-primary action-pill @(IsLoggedIn ? string.Empty : "disabled")" @onclick="ToggleShare">🔄 Share</button>
       </div>
@@ -116,6 +144,9 @@
   [Parameter] public required string Preview { get; set; }
   [Parameter] public required string FullBody { get; set; }
   [Parameter] public int CommentCount { get; set; }
+  [Parameter] public int LikeCount { get; set; }
+  [Parameter] public bool IsLiked { get; set; }
+  [Parameter] public List<PostMediaDto> Media { get; set; } = new();
   [Parameter] public bool IsLoggedIn { get; set; }
 
   private bool expanded;
@@ -132,15 +163,20 @@
   private List<CommentDto> comments = new();
   private readonly string[] likeNames = new[] { "Avery", "Jordan", "Mia", "Noah", "Kai" };
 
-  private string Body => FullBody;
+  private string SafePreview => string.IsNullOrWhiteSpace(Preview) ? string.Empty : Preview;
+  private string SafeFullBody => string.IsNullOrWhiteSpace(FullBody) ? string.Empty : FullBody;
+  private string DisplayedBody => expanded ? SafeFullBody : SafePreview;
 
-  private bool NeedsSeeMore => !expanded && Body.Length > 250;
+  private bool NeedsSeeMore =>
+      !string.IsNullOrWhiteSpace(SafeFullBody)
+      && !string.Equals(SafePreview, SafeFullBody, StringComparison.Ordinal)
+      && SafeFullBody.Length > SafePreview.Length;
 
   private string followLabel => followState ? "Following" : "Follow";
 
   protected override void OnInitialized()
   {
-    likeCount = Math.Max(5, CommentCount + 12);
+    likeCount = Math.Max(0, LikeCount);
     shareCount = Math.Max(3, CommentCount / 2 + 2);
   }
 
@@ -156,7 +192,7 @@
     showLoginPrompt = false;
   }
 
-  private void HandleLike()
+  private async Task HandleLike()
   {
     if (!IsLoggedIn)
     {
@@ -165,12 +201,22 @@
       return;
     }
 
-    showLoginPrompt = false;
-    likesPopup = true;
-
-    if (likeCount > 0)
+    var currentUser = SimpleAuthProvider.GetCurrentUserDtoOrNull();
+    if (currentUser is null)
     {
-      likeCount += 1;
+      showLoginPrompt = true;
+      return;
+    }
+
+    showLoginPrompt = false;
+    try
+    {
+      var status = await PostSvc.ToggleLikeAsync(Post.Id, currentUser.Id);
+      likeCount = status.LikeCount;
+      IsLiked = status.IsLiked;
+    }
+    catch
+    {
     }
   }
 
@@ -235,6 +281,30 @@
     {
       commentsLoading = false;
     }
+  }
+
+  private static bool IsImage(PostMediaDto? media)
+  {
+    if (media is null) return false;
+
+    var type = media.MediaType?.Trim().ToLowerInvariant();
+    if (type == "image" || (type?.StartsWith("image/") ?? false))
+        return true;
+
+    var ext = Path.GetExtension(media.Url ?? string.Empty).ToLowerInvariant();
+    return ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".webp" or ".bmp" or ".svg";
+  }
+
+  private static bool IsVideo(PostMediaDto? media)
+  {
+    if (media is null) return false;
+
+    var type = media.MediaType?.Trim().ToLowerInvariant();
+    if (type == "video" || (type?.StartsWith("video/") ?? false))
+        return true;
+
+    var ext = Path.GetExtension(media.Url ?? string.Empty).ToLowerInvariant();
+    return ext is ".mp4" or ".webm" or ".ogg" or ".mov";
   }
 
   private static string GetInitials(string? name)

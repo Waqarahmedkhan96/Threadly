@@ -6,6 +6,7 @@
 @inject BlazorApp.Services.Interfaces.IUserService UserSvc
 @inject BlazorApp.Services.Interfaces.ICommentService CommentSvc
 @inject AuthenticationStateProvider AuthProvider
+@inject BlazorApp.Services.Auth.SimpleAuthProvider SimpleAuthProvider
 
 <div class="feed-header mb-4">
   <div>
@@ -55,6 +56,9 @@ else
           Preview="item.Preview"
           FullBody="item.FullBody"
           CommentCount="item.CommentCount"
+          LikeCount="item.LikeCount"
+          IsLiked="item.IsLiked"
+          Media="item.Media"
           IsLoggedIn="isLoggedIn" />
     }
   }
@@ -89,6 +93,9 @@ else
     public required string Preview { get; set; }
     public required string FullBody { get; set; }
     public int CommentCount { get; set; }
+    public int LikeCount { get; set; }
+    public bool IsLiked { get; set; }
+    public List<PostMediaDto> Media { get; set; } = new();
     public int AuthorUserId { get; set; }
   }
 
@@ -104,6 +111,7 @@ else
     loading = true;
     try
     {
+      var currentUserId = SimpleAuthProvider.GetCurrentUserDtoOrNull()?.Id;
       var summaries = await PostSvc.GetPostsAsync(new PostQueryParameters { TitleContains = null });
 
       var users = await UserSvc.GetAllUsersAsync();
@@ -123,7 +131,7 @@ else
       var list = new List<FeedItem>();
       foreach (var s in summaries)
       {
-        var full = await PostSvc.GetPostByIdAsync(s.Id);
+        var full = await PostSvc.GetPostByIdAsync(s.Id, currentUserId);
 
         s.AuthorName = usersById.TryGetValue(full.AuthorUserId, out var nm) ? nm : null;
 
@@ -137,6 +145,9 @@ else
           Preview = preview,
           FullBody = body,
           CommentCount = counts.TryGetValue(s.Id, out var n) ? n : 0,
+          LikeCount = full.LikeCount,
+          IsLiked = full.IsLikedByCurrentUser,
+          Media = full.Media?.ToList() ?? new List<PostMediaDto>(),
           AuthorUserId = full.AuthorUserId
         });
       }

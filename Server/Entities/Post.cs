@@ -11,8 +11,9 @@ public class Post
     public int UserId { get; set; }        // FK to User
     public User User { get; set; } = null!;    // navigation User
 
-    public ICollection<Comment> Comments { get; set; } // post comments
-        = new List<Comment>();                         // init collection
+    public ICollection<Comment> Comments { get; set; } = new List<Comment>();
+    public ICollection<PostMedia> Media { get; set; } = new List<PostMedia>();
+    public ICollection<PostLike> Likes { get; set; } = new List<PostLike>();
 
     public Post() { }  // fOr EFC only
 

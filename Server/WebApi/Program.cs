@@ -1,7 +1,9 @@
 using EfcRepositories;
 using Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using RepositoryContracts;
+using System.IO;
 using System.Text.Json;                     // JSON settings
 using System.Text.Json.Serialization;      // ReferenceHandler
 
@@ -39,10 +41,12 @@ builder.Services.AddTransient<GlobalExceptionHandlerMiddleware>();
 
 var app = builder.Build();
 
-// seed default user if missing
+// seed default user if missing and apply any pending migrations
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<EfAppContext>();
+    db.Database.Migrate();
+
     if (!db.Users.Any(u => u.Username == "Lala"))
     {
         db.Users.Add(new User("Lala", "3333"));
@@ -58,6 +62,18 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(); // Swagger
 }
+
+var uploadsRoot = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
+if (!Directory.Exists(uploadsRoot))
+{
+    Directory.CreateDirectory(uploadsRoot);
+}
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(uploadsRoot),
+    RequestPath = "/uploads"
+});
 
 app.UseHttpsRedirection();
 app.MapControllers();

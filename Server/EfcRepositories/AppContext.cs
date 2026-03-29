@@ -1,33 +1,62 @@
 ﻿using Entities;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
-using System.Linq;
 
 namespace EfcRepositories;
+
 public class AppContext : DbContext
 {
     public DbSet<Post> Posts => Set<Post>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Comment> Comments => Set<Comment>();
+    public DbSet<PostMedia> PostMedias => Set<PostMedia>();
+    public DbSet<PostLike> PostLikes => Set<PostLike>();
+
+    public AppContext()
+    {
+    }
+
+    public AppContext(DbContextOptions<AppContext> options) : base(options)
+    {
+    }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // Prefer the local WebApi database file relative to the current running assembly.
-        var baseDir = System.AppContext.BaseDirectory;
-        var candidatePaths = new[]
-        {
-            Path.Combine(baseDir, "app.db"),
-            Path.Combine(baseDir, "..", "app.db"),
-            Path.Combine(baseDir, "..", "..", "app.db"),
-            Path.Combine(baseDir, "..", "..", "..", "app.db"),
-            Path.Combine(baseDir, "..", "..", "..", "..", "WebApi", "app.db"),
-            Path.Combine(Directory.GetCurrentDirectory(), "app.db"),
-            Path.Combine(Directory.GetCurrentDirectory(), "Server", "WebApi", "app.db")
-        };
+        if (optionsBuilder.IsConfigured) return;
 
-        var dbPath = candidatePaths.FirstOrDefault(Path.Exists)
-                     ?? Path.GetFullPath(Path.Combine(baseDir, "..", "..", "WebApi", "app.db"));
+        var dbPath = Path.GetFullPath(
+            Path.Combine(Directory.GetCurrentDirectory(), "Server", "WebApi", "app.db")
+        );
+
+        var dbDirectory = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrWhiteSpace(dbDirectory) && !Directory.Exists(dbDirectory))
+        {
+            Directory.CreateDirectory(dbDirectory);
+        }
 
         optionsBuilder.UseSqlite($"Data Source={dbPath}");
+    }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        modelBuilder.Entity<PostLike>()
+            .HasKey(pl => new { pl.PostId, pl.UserId });
+
+        modelBuilder.Entity<PostLike>()
+            .HasOne(pl => pl.Post)
+            .WithMany(p => p.Likes)
+            .HasForeignKey(pl => pl.PostId);
+
+        modelBuilder.Entity<PostLike>()
+            .HasOne(pl => pl.User)
+            .WithMany()
+            .HasForeignKey(pl => pl.UserId);
+
+        modelBuilder.Entity<PostMedia>()
+            .HasOne(pm => pm.Post)
+            .WithMany(p => p.Media)
+            .HasForeignKey(pm => pm.PostId);
     }
 }
