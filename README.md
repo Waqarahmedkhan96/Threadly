@@ -1,10 +1,3 @@
-Perfect — now let’s upgrade your README to **🔥 recruiter-level / SaaS startup quality**
-This is the kind that makes hiring managers stop and look.
-
-👉 Copy everything below into your `README.md`
-
----
-
 # 🚀 Threadly
 
 ### A Modern Social SaaS Platform for Media-Driven Conversations
