@@ -40,26 +40,17 @@ It is designed to simulate a **real-world scalable product**, focusing on:
 
 ## 🎬 Preview
 
-> Replace these with your screenshots or GIFs
-
 ```md
 ## 🎬 Preview
 
-### 🏠 Home Feed
-<img width="1341" height="927" alt="Screenshot 2026-03-29 132833" src="https://github.com/user-attachments/assets/3cdf2321-5920-45ed-8fee-67c9bf0f76aa" />
+### Sign Up
+c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132730.png
+### Log In
+c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132702.png
+### Home Feed
+c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132833.png
+c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132925.png
 
-
-### 📝 Create Post with Media
-![Create](./preview/create.png)
-
-### 📄 Post Details View
-![Details](./preview/details.png)
-```
-
-👉 Create this folder:
-
-```
-/preview
 ```
 
 ---
