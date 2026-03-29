@@ -44,12 +44,15 @@ It is designed to simulate a **real-world scalable product**, focusing on:
 ## 🎬 Preview
 
 ### Sign Up
-c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132730.png
+![Sign Up](./preview/signup.png)
+
 ### Log In
-c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132702.png
+![Log In](./preview/login.png)
+
 ### Home Feed
-c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132833.png
-c:\Users\waqar\OneDrive\Pictures\Screenshots\Screenshot 2026-03-29 132925.png
+![Home Feed 1](./preview/home-feed-1.png)
+
+![Home Feed 2](./preview/home-feed-2.png)
 
 ```
 
